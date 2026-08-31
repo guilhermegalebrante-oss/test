@@ -1,0 +1,124 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+
+local ESP_NAME = "LennonEggESP_Leve"
+if Workspace:FindFirstChild(ESP_NAME) then
+    Workspace[ESP_NAME]:Destroy()
+end
+
+local Folder = Instance.new("Folder")
+Folder.Name = ESP_NAME
+Folder.Parent = Workspace
+
+-- Tenta pegar a calculadora interna caso o jogo deixe (com proteção pcall)
+local MutationsModule = nil
+for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+    if obj:IsA("ModuleScript") and obj.Name == "Mutations" then
+        local sucesso, modulo = pcall(require, obj)
+        if sucesso then MutationsModule = modulo end
+        break
+    end
+end
+
+-- Mapeia os nomes e ícones direto da fonte do jogo
+local EggDatabase = {}
+task.spawn(function()
+    local configs = ReplicatedStorage:FindFirstChild("Data") 
+    if configs and configs:FindFirstChild("Assets") and configs.Assets:FindFirstChild("Configs") then
+        for _, module in ipairs(configs.Assets.Configs:GetChildren()) do
+            if module:IsA("ModuleScript") then
+                pcall(function()
+                    local data = require(module)
+                    if type(data) == "table" and data.Egg then
+                        EggDatabase[module.Name] = data.Egg.DisplayName or module.Name
+                    end
+                end)
+            end
+        end
+    end
+end)
+
+-- Função para tentar descobrir o valor do ovo (somente se ele já existir!)
+local function getEggValue(modelo)
+    -- 1. Atributos
+    local val = modelo:GetAttribute("Value") or modelo:GetAttribute("Price") or modelo:GetAttribute("Cost")
+    if val then return tostring(val) end
+
+    -- 2. Etiquetas 3D (BillboardGui) que o próprio jogo coloca quando ele "nasce"
+    for _, desc in ipairs(modelo:GetDescendants()) do
+        if desc:IsA("BillboardGui") or desc:IsA("SurfaceGui") then
+            for _, texto in ipairs(desc:GetDescendants()) do
+                if texto:IsA("TextLabel") then
+                    local num = tonumber(string.match(texto.Text, "[%d%.]+[KkMmTt]?"))
+                    if num then return texto.Text end -- Retorna o texto (ex: $1.2T)
+                end
+            end
+        end
+    end
+
+    -- 3. Tenta calcular pela calculadora (caso o "Gold" pare de dar erro e o ovo já tenha ID)
+    if MutationsModule and MutationsModule.EarningsFor then
+        local sucesso, valor = pcall(MutationsModule.EarningsFor, modelo.Name)
+        if sucesso and type(valor) == "number" and valor > 0 then
+            if valor >= 1000000 then return string.format("%.2fM", valor/1000000) end
+            if valor >= 1000 then return string.format("%.2fK", valor/1000) end
+            return tostring(valor)
+        end
+    end
+
+    -- 4. Se nada disso existir ainda, retorna nada (não mostra o valor)
+    return nil
+end
+
+local function criarTag(modelo, texto)
+    if modelo:FindFirstChild("LennonTag") then return end
+
+    local Billboard = Instance.new("BillboardGui")
+    Billboard.Name = "LennonTag"
+    Billboard.Size = UDim2.new(0, 220, 0, 40)
+    Billboard.StudsOffset = Vector3.new(0, 3, 0)
+    Billboard.AlwaysOnTop = true
+    Billboard.Adornee = modelo
+    Billboard.Parent = Folder
+
+    local TextLabel = Instance.new("TextLabel")
+    TextLabel.Size = UDim2.new(1, 0, 1, 0)
+    TextLabel.BackgroundTransparency = 1
+    TextLabel.Text = texto
+    TextLabel.TextColor3 = Color3.fromRGB(50, 255, 100)
+    TextLabel.TextStrokeTransparency = 0
+    TextLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    TextLabel.Font = Enum.Font.GothamBold
+    TextLabel.TextSize = 14
+    TextLabel.Parent = Billboard
+end
+
+-- Varre o mapa de forma segura e inteligente
+task.spawn(function()
+    while task.wait(1) do
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            -- Se for um modelo com nome grande (o UID do ovo)
+            if obj:IsA("Model") and string.len(obj.Name) > 20 then
+                if not obj:FindFirstChild("LennonTag") then
+                    
+                    -- Descobre o nome do ovo pelo banco de dados montado
+                    local nomeOvo = EggDatabase[obj.Name] or "Ovo"
+                    
+                    -- Tenta pegar o valor (se já tiver nascido)
+                    local valorOvo = getEggValue(obj)
+                    
+                    -- Monta o texto da etiqueta
+                    local textoFinal = "🥚 " .. nomeOvo
+                    if valorOvo then
+                        textoFinal = textoFinal .. " | 💰 " .. tostring(valorOvo)
+                    end
+
+                    criarTag(obj, textoFinal)
+                end
+            end
+        end
+    end
+end)
+
+print("[LENNON HUB] ESP Ativado! Mostrando nomes e valores quando disponíveis!")
