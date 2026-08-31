@@ -1,0 +1,24 @@
+local Workspace = game:GetService("Workspace")
+
+print("--- INSPECIONANDO DADOS DOS OVOS NA RAM ---")
+local count = 0
+
+for _, obj in pairs(getgc(true)) do
+    if type(obj) == "table" then
+        pcall(function()
+            -- Procura qualquer tabela na RAM que tenha UID ou ID de ovo
+            local uid = obj.UID or obj.Id
+            if uid and type(uid) == "string" and #uid > 15 then
+                count = count + 1
+                if count <= 3 then -- Mostra apenas os 3 primeiros para não lotar o console
+                    print("--- OVO ENCONTRADO NA RAM ---")
+                    for k, v in pairs(obj) do
+                        print("  Chave:", tostring(k), "| Tipo:", type(v), "| Valor:", tostring(v))
+                    end
+                end
+            end
+        end)
+    end
+end
+
+print("Total de ovos analisados na varredura:", count)
