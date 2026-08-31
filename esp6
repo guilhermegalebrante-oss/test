@@ -1,0 +1,221 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+-- 1. ROUBANDO O MÓDULO
+local MutationsModule = nil
+for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+    if obj:IsA("ModuleScript") and obj.Name == "Mutations" then
+        MutationsModule = require(obj)
+        break
+    end
+end
+
+if not MutationsModule then
+    warn("Módulo não encontrado!")
+    return
+end
+
+-- 2. FUNÇÃO PARA FORMATAR VALORES (Ex: 1271M, 1.97M)
+local function formatValue(v)
+    if v >= 1000000 then return string.format("%.2fM", v/1000000) end
+    if v >= 1000 then return string.format("%.2fK", v/1000) end
+    return tostring(math.floor(v))
+end
+
+-- 3. COLETA OS OVOS INSTANTANEAMENTE (LOOP SEGURO DE IDs)
+local function collectEggs()
+    local ovos = {}
+    
+    -- Testa IDs de 1 até 200 (você pode aumentar se quiser, mas 200 é o suficiente)
+    for id = 1, 200 do
+        local dadosOvo = nil
+        
+        -- Tenta pegar os dados usando a função Get
+        if type(MutationsModule.Get) == "function" then
+            local sucesso, resultado = pcall(MutationsModule.Get, id)
+            if sucesso and resultado ~= nil then dadosOvo = resultado end
+        end
+
+        -- Se Get falhar, tenta RollTable (se existir)
+        if not dadosOvo and type(MutationsModule.RollTable) == "table" then
+            pcall(function() dadosOvo = MutationsModule.RollTable[id] end)
+        end
+
+        -- Se os dados existirem, calcula nome, raridade e valor
+        if dadosOvo ~= nil then
+            local nome = "Ovo " .. id
+            local raridade = "?"
+            local valor = 0
+
+            -- Pega o Nome
+            pcall(function()
+                if MutationsModule.EggDisplayName then
+                    local n = MutationsModule.EggDisplayName(id)
+                    if typeof(n) == "string" and n ~= "" then nome = n end
+                end
+            end)
+
+            -- Pega a Raridade
+            pcall(function()
+                if MutationsModule.RarityFactorFor then
+                    local r = MutationsModule.RarityFactorFor(id)
+                    if typeof(r) == "string" and r ~= "" then raridade = r end
+                end
+            end)
+
+            -- Pega o Valor (Calculadora)
+            pcall(function()
+                if MutationsModule.EarningsFor then
+                    local v = MutationsModule.EarningsFor(id)
+                    if typeof(v) == "number" and v > 0 then valor = v end
+                end
+            end)
+
+            -- Se conseguiu um valor > 0, adiciona na lista
+            if valor > 0 then
+                table.insert(ovos, {Nome = nome, Raridade = raridade, Valor = valor})
+            end
+        end
+    end
+
+    -- Ordena do mais caro para o mais barato
+    table.sort(ovos, function(a, b) return a.Valor > b.Valor end)
+    return ovos
+end
+
+-- 4. CRIAÇÃO DA GUI (LENNON HUB)
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "LennonHubFinal"
+ScreenGui.Parent = player:WaitForChild("PlayerGui")
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 400, 0, 550)
+MainFrame.Position = UDim2.new(0.5, -200, 0.5, -275)
+MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = ScreenGui
+
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 50)
+TitleBar.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+TitleBar.Parent = MainFrame
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(0, 200, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.Text = "LENNON HUB"
+Title.Font = Enum.Font.GothamBold
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.TextSize = 20
+Title.Parent = TitleBar
+
+local SubTitle = Instance.new("TextLabel")
+SubTitle.Size = UDim2.new(0, 200, 0, 20)
+SubTitle.Position = UDim2.new(0, 12, 0, 28)
+SubTitle.Text = "BEST EGG SYSTEM"
+SubTitle.Font = Enum.Font.Gotham
+SubTitle.TextColor3 = Color3.fromRGB(150, 150, 150)
+SubTitle.TextXAlignment = Enum.TextXAlignment.Left
+SubTitle.TextSize = 10
+SubTitle.Parent = TitleBar
+
+local List = Instance.new("ScrollingFrame")
+List.Size = UDim2.new(1, -20, 1, -70)
+List.Position = UDim2.new(0, 10, 0, 60)
+List.BackgroundTransparency = 1
+List.Parent = MainFrame
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.Padding = UDim.new(0, 10)
+UIListLayout.Parent = List
+
+-- 5. FUNÇÃO DE CORES DE RARIDADE
+local function getRarityColor(r)
+    local rLower = string.lower(r or "")
+    if string.find(rLower, "cosmic") then return Color3.fromRGB(180, 0, 255) end
+    if string.find(rLower, "mythic") then return Color3.fromRGB(255, 100, 0) end
+    if string.find(rLower, "legend") then return Color3.fromRGB(255, 215, 0) end
+    if string.find(rLower, "epic") then return Color3.fromRGB(150, 0, 255) end
+    if string.find(rLower, "rare") then return Color3.fromRGB(0, 150, 255) end
+    return Color3.fromRGB(180, 180, 180)
+end
+
+-- 6. RENDERIZAÇÃO NA TELA (MOSTRAR OVOS)
+local function renderEggs(ovos)
+    for _, child in pairs(List:GetChildren()) do
+        if child:IsA("Frame") then child:Destroy() end
+    end
+
+    if #ovos > 0 then
+        for i, egg in ipairs(ovos) do
+            if i > 10 then break end -- Top 10
+
+            local row = Instance.new("Frame")
+            row.Size = UDim2.new(1, 0, 0, 60)
+            row.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+            row.BorderSizePixel = 0
+            row.Parent = List
+            
+            local rank = Instance.new("TextLabel")
+            rank.Size = UDim2.new(0, 40, 1, 0)
+            rank.Text = "#" .. i
+            rank.TextColor3 = Color3.new(0.5, 0.5, 0.5)
+            rank.Font = Enum.Font.GothamBold
+            rank.TextXAlignment = Enum.TextXAlignment.Center
+            rank.Parent = row
+
+            local nome = Instance.new("TextLabel")
+            nome.Size = UDim2.new(0, 180, 0, 25)
+            nome.Position = UDim2.new(0, 40, 0, 5)
+            nome.Text = egg.Nome
+            nome.TextColor3 = Color3.new(1, 1, 1)
+            nome.Font = Enum.Font.GothamBold
+            nome.TextScaled = true
+            nome.TextXAlignment = Enum.TextXAlignment.Left
+            nome.Parent = row
+
+            local rar = Instance.new("TextLabel")
+            rar.Size = UDim2.new(0, 180, 0, 20)
+            rar.Position = UDim2.new(0, 40, 0, 30)
+            rar.Text = egg.Raridade
+            rar.TextColor3 = getRarityColor(egg.Raridade)
+            rar.Font = Enum.Font.Gotham
+            rar.TextSize = 14
+            rar.TextXAlignment = Enum.TextXAlignment.Left
+            rar.Parent = row
+
+            local val = Instance.new("TextLabel")
+            val.Size = UDim2.new(0, 120, 1, 0)
+            val.Position = UDim2.new(1, -130, 0, 0)
+            val.Text = formatValue(egg.Valor)
+            val.TextColor3 = Color3.new(1, 1, 1)
+            val.Font = Enum.Font.GothamBold
+            val.TextSize = 15
+            val.TextXAlignment = Enum.TextXAlignment.Right
+            val.Parent = row
+        end
+    else
+        local empty = Instance.new("TextLabel")
+        empty.Size = UDim2.new(1, 0, 0, 40)
+        empty.Text = "Nenhum ovo encontrado."
+        empty.TextColor3 = Color3.new(1, 1, 1)
+        empty.Parent = List
+    end
+end
+
+-- 7. EXECUÇÃO INSTANTÂNEA
+print("Iniciando varredura instantânea...")
+local ovos = collectEggs()
+renderEggs(ovos)
+print("Varredura concluída. Total de ovos:", #ovos)
+
+-- Atualiza a cada 10 segundos (mas já está na tela agora)
+task.spawn(function()
+    while true do
+        task.wait(10)
+        local novosOvos = collectEggs()
+        renderEggs(novosOvos)
+    end
+end)
