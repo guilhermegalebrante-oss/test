@@ -1,0 +1,57 @@
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+
+local ESP_NAME = "LennonEggESP_Final"
+if Workspace:FindFirstChild(ESP_NAME) then
+    Workspace[ESP_NAME]:Destroy()
+end
+
+local Folder = Instance.new("Folder")
+Folder.Name = ESP_NAME
+Folder.Parent = Workspace
+
+local function criarTag(modelo, texto)
+    if modelo:FindFirstChild("LennonTag") then return end
+
+    local Billboard = Instance.new("BillboardGui")
+    Billboard.Name = "LennonTag"
+    Billboard.Size = UDim2.new(0, 160, 0, 40)
+    Billboard.StudsOffset = Vector3.new(0, 3, 0)
+    Billboard.AlwaysOnTop = true
+    Billboard.Adornee = modelo
+    Billboard.Parent = Folder
+
+    local TextLabel = Instance.new("TextLabel")
+    TextLabel.Size = UDim2.new(1, 0, 1, 0)
+    TextLabel.BackgroundTransparency = 1
+    TextLabel.Text = texto
+    TextLabel.TextColor3 = Color3.fromRGB(50, 255, 100)
+    TextLabel.TextStrokeTransparency = 0
+    TextLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    TextLabel.Font = Enum.Font.GothamBold
+    TextLabel.TextSize = 13
+    TextLabel.Parent = Billboard
+end
+
+-- Varredura leve e segura para não travar
+task.spawn(function()
+    while task.wait(1.5) do
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            if obj:IsA("Model") and string.len(obj.Name) > 20 then
+                if not obj:FindFirstChild("LennonTag") then
+                    -- Identifica se tem subcomponentes ou define como Ovo no Chão (aguardando chocar)
+                    local statusOvo = "🥚 Ovo (Aguardando)"
+                    
+                    -- Se o modelo tiver filhos indicando que eclodiu ou mudou de estado
+                    if obj:FindFirstChild("Humanoid") or obj:FindFirstChild("Head") then
+                        statusOvo = "✨ Bicho Chocado!"
+                    end
+
+                    criarTag(obj, statusOvo)
+                end
+            end
+        end
+    end
+end)
+
+print("[LENNON HUB] ESP Atualizado com Suceso!")
