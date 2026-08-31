@@ -1,0 +1,137 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+
+local ESP_NAME = "LennonEggESP_Leve"
+if Workspace:FindFirstChild(ESP_NAME) then
+    Workspace[ESP_NAME]:Destroy()
+end
+
+local Folder = Instance.new("Folder")
+Folder.Name = ESP_NAME
+Folder.Parent = Workspace
+
+-- 1. FUNÇÃO PARA LER O NOME QUE ESTÁ "DENTRO" DO OVO
+local function getEggName(modelo)
+    -- Tenta pegar o nome em atributos escondidos
+    local attrs = modelo:GetAttributes()
+    if attrs["EggName"] then return attrs["EggName"] end
+    if attrs["DisplayName"] then return attrs["DisplayName"] end
+    if attrs["Name"] then return attrs["Name"] end
+    if attrs["ID"] then 
+        -- Se for um ID, tenta buscar o nome usando o módulo que achamos antes
+        if MutationsModule and MutationsModule.EggDisplayName then
+            local sucesso, nomeReal = pcall(MutationsModule.EggDisplayName, attrs["ID"])
+            if sucesso and nomeReal and nomeReal ~= "" then return nomeReal end
+        end
+    end
+
+    -- Tenta pegar de valores de string escondidos dentro do modelo
+    for _, child in ipairs(modelo:GetChildren()) do
+        if child:IsA("StringValue") and child.Value ~= "" then return child.Value end
+        if child:IsA("IntValue") or child:IsA("NumberValue") then
+            -- Se tiver um ID numérico, tenta usar a calculadora
+            if MutationsModule and MutationsModule.EggDisplayName then
+                local sucesso, nomeReal = pcall(MutationsModule.EggDisplayName, child.Value)
+                if sucesso and nomeReal and nomeReal ~= "" then return nomeReal end
+            end
+        end
+    end
+
+    -- Tenta ler qualquer texto 3D flutuante (Billboard/SurfaceGui) dentro do modelo
+    for _, desc in ipairs(modelo:GetDescendants()) do
+        if desc:IsA("BillboardGui") or desc:IsA("SurfaceGui") then
+            for _, texto in ipairs(desc:GetDescendants()) do
+                if texto:IsA("TextLabel") or texto:IsA("TextButton") then
+                    if texto.Text ~= "" and not string.find(texto.Text, "%$") and not string.find(texto.Text, "%d") then
+                        return texto.Text -- Retorna o primeiro texto que não seja número
+                    end
+                end
+            end
+        end
+    end
+
+    return "Ovo Desconhecido" -- Último recurso
+end
+
+-- 2. FUNÇÃO PARA LER O VALOR (Se já tiver nascido)
+local function getEggValue(modelo)
+    local attrs = modelo:GetAttributes()
+    local val = attrs["Value"] or attrs["Price"] or attrs["Cost"]
+    if val then return tostring(val) end
+
+    for _, child in ipairs(modelo:GetChildren()) do
+        if child:IsA("IntValue") or child:IsA("NumberValue") then
+            local nomeLower = string.lower(child.Name)
+            if string.find(nomeLower, "val") or string.find(nomeLower, "price") or string.find(nomeLower, "cost") then
+                return tostring(child.Value)
+            end
+        end
+    end
+
+    for _, desc in ipairs(modelo:GetDescendants()) do
+        if desc:IsA("BillboardGui") or desc:IsA("SurfaceGui") then
+            for _, texto in ipairs(desc:GetDescendants()) do
+                if texto:IsA("TextLabel") then
+                    local num = string.match(texto.Text, "%$?[%d%.]+[KkMmTt]?")
+                    if num then return num end
+                end
+            end
+        end
+    end
+    return nil
+end
+
+-- 3. CRIAÇÃO DA TAG
+local function criarTag(modelo, texto)
+    if modelo:FindFirstChild("LennonTag") then return end
+
+    local Billboard = Instance.new("BillboardGui")
+    Billboard.Name = "LennonTag"
+    Billboard.Size = UDim2.new(0, 220, 0, 40)
+    Billboard.StudsOffset = Vector3.new(0, 3, 0)
+    Billboard.AlwaysOnTop = true
+    Billboard.Adornee = modelo
+    Billboard.Parent = Folder
+
+    local TextLabel = Instance.new("TextLabel")
+    TextLabel.Size = UDim2.new(1, 0, 1, 0)
+    TextLabel.BackgroundTransparency = 1
+    TextLabel.Text = texto
+    TextLabel.TextColor3 = Color3.fromRGB(50, 255, 100)
+    TextLabel.TextStrokeTransparency = 0
+    TextLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    TextLabel.Font = Enum.Font.GothamBold
+    TextLabel.TextSize = 14
+    TextLabel.Parent = Billboard
+end
+
+-- 4. VARREDURA PRINCIPAL
+task.spawn(function()
+    while task.wait(1) do
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            if obj:IsA("Model") and string.len(obj.Name) > 20 and not obj:FindFirstChild("LennonTag") then
+                
+                -- PEGA O NOME DE DENTRO DO OVO
+                local nomeOvo = getEggName(obj)
+                
+                -- TENTA PEGAR O VALOR (pode ser nil se não nasceu)
+                local valorOvo = getEggValue(obj)
+
+                -- MONTA O TEXTO
+                local textoFinal = "🥚 " .. nomeOvo
+                if valorOvo then
+                    textoFinal = textoFinal .. " | 💰 " .. valorOvo
+                end
+
+                -- CRIA A TAG
+                criarTag(obj, textoFinal)
+
+                -- PRINT NO F9 (PARA DEBUG)
+                print("Ovo detectado! ID:", string.sub(obj.Name, 1, 10), "| Nome:", nomeOvo, "| Valor:", valorOvo or "Aguardando nascer")
+            end
+        end
+    end
+end)
+
+print("[LENNON HUB] ESP Inteligente Ativado! Agora ele lê o nome de dentro do ovo.")
