@@ -1,0 +1,70 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+
+local ESP_NAME = "LennonEggESP_Leve"
+if Workspace:FindFirstChild(ESP_NAME) then
+    Workspace[ESP_NAME]:Destroy()
+end
+
+local Folder = Instance.new("Folder")
+Folder.Name = ESP_NAME
+Folder.Parent = Workspace
+
+-- Mapeia os nomes e ícones direto da fonte do jogo (Roda só 1 vez)
+local EggDatabase = {}
+task.spawn(function()
+    local configs = ReplicatedStorage:FindFirstChild("Data") 
+    if configs and configs:FindFirstChild("Assets") and configs.Assets:FindFirstChild("Configs") then
+        for _, module in ipairs(configs.Assets.Configs:GetChildren()) do
+            if module:IsA("ModuleScript") then
+                pcall(function()
+                    local data = require(module)
+                    if type(data) == "table" and data.Egg then
+                        EggDatabase[module.Name] = data.Egg.DisplayName or module.Name
+                    end
+                end)
+            end
+        end
+    end
+end)
+
+local function criarTag(modelo, texto)
+    if modelo:FindFirstChild("LennonTag") then return end
+
+    local Billboard = Instance.new("BillboardGui")
+    Billboard.Name = "LennonTag"
+    Billboard.Size = UDim2.new(0, 160, 0, 40)
+    Billboard.StudsOffset = Vector3.new(0, 3, 0)
+    Billboard.AlwaysOnTop = true
+    Billboard.Adornee = modelo
+    Billboard.Parent = Folder
+
+    local TextLabel = Instance.new("TextLabel")
+    TextLabel.Size = UDim2.new(1, 0, 1, 0)
+    TextLabel.BackgroundTransparency = 1
+    TextLabel.Text = texto
+    TextLabel.TextColor3 = Color3.fromRGB(50, 255, 100)
+    TextLabel.TextStrokeTransparency = 0
+    TextLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    TextLabel.Font = Enum.Font.GothamBold
+    TextLabel.TextSize = 14
+    TextLabel.Parent = Billboard
+end
+
+-- Varre o mapa de forma segura e inteligente
+task.spawn(function()
+    while task.wait(1) do
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            -- Se for um modelo com nome grande (o UID do ovo)
+            if obj:IsA("Model") and string.len(obj.Name) > 20 then
+                if not obj:FindFirstChild("LennonTag") then
+                    -- Tenta adivinhar o tipo com base nos módulos carregados ou exibe o ID
+                    criarTag(obj, "🥚 Ovo Encontrado")
+                end
+            end
+        end
+    end
+end)
+
+print("[LENNON HUB] ESP Leve Ativado com Sucesso!")
