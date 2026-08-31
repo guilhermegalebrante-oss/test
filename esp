@@ -1,70 +1,214 @@
+local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace = game:GetService("Workspace")
 
-local ESP_NAME = "LennonEggESP_Leve"
-if Workspace:FindFirstChild(ESP_NAME) then
-    Workspace[ESP_NAME]:Destroy()
+local UI_NAME = "LennonHub_Instant"
+if CoreGui:FindFirstChild(UI_NAME) then
+    CoreGui[UI_NAME]:Destroy()
+elseif Players.LocalPlayer.PlayerGui:FindFirstChild(UI_NAME) then
+    Players.LocalPlayer.PlayerGui[UI_NAME]:Destroy()
 end
 
-local Folder = Instance.new("Folder")
-Folder.Name = ESP_NAME
-Folder.Parent = Workspace
+-- ==========================================
+-- 1. CRIAÇÃO DA INTERFACE (ESTILO LENNON HUB)
+-- ==========================================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = UI_NAME
+local success = pcall(function() ScreenGui.Parent = CoreGui end)
+if not success then ScreenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui") end
 
--- Mapeia os nomes e ícones direto da fonte do jogo (Roda só 1 vez)
-local EggDatabase = {}
-task.spawn(function()
-    local configs = ReplicatedStorage:FindFirstChild("Data") 
-    if configs and configs:FindFirstChild("Assets") and configs.Assets:FindFirstChild("Configs") then
-        for _, module in ipairs(configs.Assets.Configs:GetChildren()) do
-            if module:IsA("ModuleScript") then
-                pcall(function()
-                    local data = require(module)
-                    if type(data) == "table" and data.Egg then
-                        EggDatabase[module.Name] = data.Egg.DisplayName or module.Name
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 320, 0, 420)
+MainFrame.Position = UDim2.new(0.5, -160, 0.5, -210)
+MainFrame.BackgroundColor3 = Color3.fromRGB(12, 16, 12)
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 12)
+UICorner.Parent = MainFrame
+
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Color = Color3.fromRGB(40, 80, 40)
+UIStroke.Thickness = 1
+UIStroke.Parent = MainFrame
+
+local Header = Instance.new("Frame")
+Header.Size = UDim2.new(1, 0, 0, 60)
+Header.BackgroundTransparency = 1
+Header.Parent = MainFrame
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -70, 0, 20)
+Title.Position = UDim2.new(0, 60, 0, 15)
+Title.BackgroundTransparency = 1
+Title.Text = "LENNON HUB"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 16
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = Header
+
+local SubTitle = Instance.new("TextLabel")
+SubTitle.Size = UDim2.new(1, -70, 0, 15)
+SubTitle.Position = UDim2.new(0, 60, 0, 35)
+SubTitle.BackgroundTransparency = 1
+SubTitle.Text = "BEST EGG SYSTEM"
+SubTitle.TextColor3 = Color3.fromRGB(100, 120, 100)
+SubTitle.Font = Enum.Font.Gotham
+SubTitle.TextSize = 10
+SubTitle.TextXAlignment = Enum.TextXAlignment.Left
+SubTitle.Parent = Header
+
+local ScrollList = Instance.new("ScrollingFrame")
+ScrollList.Size = UDim2.new(1, -20, 1, -80)
+ScrollList.Position = UDim2.new(0, 10, 0, 70)
+ScrollList.BackgroundTransparency = 1
+ScrollList.ScrollBarThickness = 0
+ScrollList.Parent = MainFrame
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.Padding = UDim.new(0, 8)
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Parent = ScrollList
+
+local function formatNumber(n)
+    if not n then return "0" end
+    if n >= 1e9 then return string.format("%.2fB", n / 1e9) end
+    if n >= 1e6 then return string.format("%.2fM", n / 1e6) end
+    if n >= 1e3 then return string.format("%.2fK", n / 1e3) end
+    return tostring(n)
+end
+
+local RarityColors = {
+    ["Cosmic"] = Color3.fromRGB(138, 43, 226),
+    ["Mythic"] = Color3.fromRGB(255, 20, 147),
+    ["Legendary"] = Color3.fromRGB(255, 140, 0),
+    ["Epic"] = Color3.fromRGB(255, 215, 0),
+    ["Rare"] = Color3.fromRGB(0, 191, 255),
+    ["Normal"] = Color3.fromRGB(200, 200, 200)
+}
+
+local function createEggCard(rank, nome, raridade, valor, isBest)
+    local Card = Instance.new("Frame")
+    Card.Size = UDim2.new(1, 0, 0, isBest and 65 or 50)
+    Card.BackgroundColor3 = Color3.fromRGB(18, 22, 18)
+    Card.LayoutOrder = rank
+    Card.Parent = ScrollList
+
+    local CardCorner = Instance.new("UICorner")
+    CardCorner.CornerRadius = UDim.new(0, 10)
+    CardCorner.Parent = Card
+
+    if isBest then
+        local CardStroke = Instance.new("UIStroke")
+        CardStroke.Color = Color3.fromRGB(50, 150, 50)
+        CardStroke.Thickness = 1
+        CardStroke.Parent = Card
+        
+        local BestText = Instance.new("TextLabel")
+        BestText.Size = UDim2.new(0, 100, 0, 15)
+        BestText.Position = UDim2.new(0, 15, 0, 8)
+        BestText.BackgroundTransparency = 1
+        BestText.Text = "BEST EGG"
+        BestText.TextColor3 = Color3.fromRGB(80, 160, 80)
+        BestText.Font = Enum.Font.GothamBold
+        BestText.TextSize = 10
+        BestText.TextXAlignment = Enum.TextXAlignment.Left
+        BestText.Parent = Card
+    else
+        local RankLabel = Instance.new("TextLabel")
+        RankLabel.Size = UDim2.new(0, 20, 1, 0)
+        RankLabel.Position = UDim2.new(0, 5, 0, 0)
+        RankLabel.BackgroundTransparency = 1
+        RankLabel.Text = "#" .. rank
+        RankLabel.TextColor3 = Color3.fromRGB(100, 100, 100)
+        RankLabel.Font = Enum.Font.GothamBold
+        RankLabel.TextSize = 12
+        RankLabel.Parent = Card
+    end
+
+    local NameLabel = Instance.new("TextLabel")
+    NameLabel.Size = UDim2.new(0, 150, 0, 20)
+    NameLabel.Position = UDim2.new(0, isBest and 15 or 30, 0, isBest and 25 or 8)
+    NameLabel.BackgroundTransparency = 1
+    NameLabel.Text = nome
+    NameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    NameLabel.Font = Enum.Font.GothamBold
+    NameLabel.TextSize = 14
+    NameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    NameLabel.Parent = Card
+
+    local RarityLabel = Instance.new("TextLabel")
+    RarityLabel.Size = UDim2.new(0, 100, 0, 15)
+    RarityLabel.Position = UDim2.new(0, isBest and 15 or 30, 0, isBest and 45 or 28) 
+    RarityLabel.BackgroundTransparency = 1
+    RarityLabel.Text = raridade
+    RarityLabel.TextColor3 = RarityColors[raridade] or Color3.fromRGB(255, 255, 255)
+    RarityLabel.Font = Enum.Font.GothamBold
+    RarityLabel.TextSize = 11
+    RarityLabel.TextXAlignment = Enum.TextXAlignment.Left
+    RarityLabel.Parent = Card
+
+    local ValueLabel = Instance.new("TextLabel")
+    ValueLabel.Size = UDim2.new(0, 100, 1, 0)
+    ValueLabel.Position = UDim2.new(1, -110, 0, 0)
+    ValueLabel.BackgroundTransparency = 1
+    ValueLabel.Text = formatNumber(valor)
+    ValueLabel.TextColor3 = Color3.fromRGB(50, 255, 100)
+    ValueLabel.Font = Enum.Font.GothamBold
+    ValueLabel.TextSize = 14
+    ValueLabel.TextXAlignment = Enum.TextXAlignment.Right
+    ValueLabel.Parent = Card
+end
+
+-- ==========================================
+-- 2. VARREDURA INSTANTÂNEA NA RAM (GETGC)
+-- ==========================================
+local function buscarOvosNaMemoria()
+    local listaOvos = {}
+    
+    for _, obj in pairs(getgc(true)) do
+        if type(obj) == "table" then
+            pcall(function()
+                -- Procura tabelas que parecem conter os dados dos ovos/pets ativos
+                if obj.MoneyPerSecond and (obj.UID or obj.Id) then
+                    local nome = "Ovo Desconhecido"
+                    if type(obj.ItemData) == "table" then
+                        nome = obj.ItemData.Id or obj.ItemData.Type or "Ovo"
+                    elseif obj.Name then
+                        nome = obj.Name
                     end
-                end)
-            end
+                    
+                    local valor = tonumber(obj.MoneyPerSecond) or 0
+                    if valor > 0 then
+                        table.insert(listaOvos, {
+                            Nome = tostring(nome):gsub(" Egg", ""),
+                            Valor = valor,
+                            Raridade = valor >= 1000000 and "Cosmic" or (valor >= 250000 and "Mythic" or "Legendary")
+                        })
+                    end
+                end
+            end)
         end
     end
-end)
-
-local function criarTag(modelo, texto)
-    if modelo:FindFirstChild("LennonTag") then return end
-
-    local Billboard = Instance.new("BillboardGui")
-    Billboard.Name = "LennonTag"
-    Billboard.Size = UDim2.new(0, 160, 0, 40)
-    Billboard.StudsOffset = Vector3.new(0, 3, 0)
-    Billboard.AlwaysOnTop = true
-    Billboard.Adornee = modelo
-    Billboard.Parent = Folder
-
-    local TextLabel = Instance.new("TextLabel")
-    TextLabel.Size = UDim2.new(1, 0, 1, 0)
-    TextLabel.BackgroundTransparency = 1
-    TextLabel.Text = texto
-    TextLabel.TextColor3 = Color3.fromRGB(50, 255, 100)
-    TextLabel.TextStrokeTransparency = 0
-    TextLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    TextLabel.Font = Enum.Font.GothamBold
-    TextLabel.TextSize = 14
-    TextLabel.Parent = Billboard
+    
+    return listaOvos
 end
 
--- Varre o mapa de forma segura e inteligente
+-- Executa IMEDIATAMENTE ao injetar
 task.spawn(function()
-    while task.wait(1) do
-        for _, obj in ipairs(Workspace:GetDescendants()) do
-            -- Se for um modelo com nome grande (o UID do ovo)
-            if obj:IsA("Model") and string.len(obj.Name) > 20 then
-                if not obj:FindFirstChild("LennonTag") then
-                    -- Tenta adivinhar o tipo com base nos módulos carregados ou exibe o ID
-                    criarTag(obj, "🥚 Ovo Encontrado")
-                end
-            end
-        end
+    local ovos = buscarOvosNaMemoria()
+    
+    -- Ordena do mais caro para o mais barato
+    table.sort(ovos, function(a, b) return a.Valor > b.Valor end)
+    
+    for i, ovo in ipairs(ovos) do
+        local isBest = (i == 1)
+        createEggCard(i, ovo.Nome, ovo.Raridade, ovo.Valor, isBest)
+    end
+    
+    if #ovos == 0 then
+        createEggCard(1, "Nenhum ovo ativo", "Normal", 0, true)
     end
 end)
-
-print("[LENNON HUB] ESP Leve Ativado com Sucesso!")
