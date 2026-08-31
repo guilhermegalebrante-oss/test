@@ -1,0 +1,95 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+
+local ESP_NAME = "LennonEggESP_Leve"
+if Workspace:FindFirstChild(ESP_NAME) then
+    Workspace[ESP_NAME]:Destroy()
+end
+
+local Folder = Instance.new("Folder")
+Folder.Name = ESP_NAME
+Folder.Parent = Workspace
+
+-- Formata o número (ex: 1500 -> 1.50K, 2500000 -> 2.50M)
+local function formatNumber(n)
+    if not n then return "0" end
+    if n >= 1e9 then return string.format("%.2fB", n / 1e9) end
+    if n >= 1e6 then return string.format("%.2fM", n / 1e6) end
+    if n >= 1e3 then return string.format("%.2fK", n / 1e3) end
+    return tostring(n)
+end
+
+-- Mapeia os dados da memória de forma rápida
+local function obterDadosDosOvos()
+    local mapaDeOvos = {}
+    pcall(function()
+        for _, obj in pairs(getgc(true)) do
+            if type(obj) == "table" then
+                local uid = obj.UID or obj.Id
+                if uid and type(uid) == "string" and obj.MoneyPerSecond then
+                    local nomeBicho = "Ovo"
+                    if type(obj.ItemData) == "table" then
+                        nomeBicho = obj.ItemData.Id or obj.ItemData.Type or "Ovo"
+                    elseif obj.Name then
+                        nomeBicho = obj.Name
+                    end
+                    nomeBicho = tostring(nomeBicho):gsub(" Egg", "")
+                    
+                    mapaDeOvos[uid] = {
+                        Nome = nomeBicho,
+                        Valor = tonumber(obj.MoneyPerSecond) or 0
+                    }
+                end
+            end
+        end
+    end)
+    return mapaDeOvos
+end
+
+local function criarTag(modelo, nomeBicho, valor)
+    if modelo:FindFirstChild("LennonTag") then return end
+
+    local Billboard = Instance.new("BillboardGui")
+    Billboard.Name = "LennonTag"
+    Billboard.Size = UDim2.new(0, 180, 0, 45)
+    Billboard.StudsOffset = Vector3.new(0, 3, 0)
+    Billboard.AlwaysOnTop = true
+    Billboard.Adornee = modelo
+    Billboard.Parent = Folder
+
+    local TextLabel = Instance.new("TextLabel")
+    TextLabel.Size = UDim2.new(1, 0, 1, 0)
+    TextLabel.BackgroundTransparency = 1
+    TextLabel.Text = string.format("🥚 %s\n💰 %s/s", nomeBicho, formatNumber(valor))
+    TextLabel.TextColor3 = Color3.fromRGB(50, 255, 100)
+    TextLabel.TextStrokeTransparency = 0
+    TextLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    TextLabel.Font = Enum.Font.GothamBold
+    TextLabel.TextSize = 13
+    TextLabel.Parent = Billboard
+end
+
+-- Varre o mapa de forma segura e atualiza os valores
+task.spawn(function()
+    while task.wait(1) do
+        local dadosOvos = obterDadosDosOvos()
+
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            if obj:IsA("Model") and string.len(obj.Name) > 20 then
+                if not obj:FindFirstChild("LennonTag") then
+                    local infoOvo = dadosOvos[obj.Name]
+                    
+                    if infoOvo then
+                        criarTag(obj, infoOvo.Nome, infoOvo.Valor)
+                    else
+                        -- Caso o cache ainda não tenha pego, exibe um placeholder até atualizar
+                        criarTag(obj, "Ovo Misterioso", 0)
+                    end
+                end
+            end
+        end
+    end
+end)
+
+print("[LENNON HUB] ESP com Valores Ativado com Sucesso!")
