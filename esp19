@@ -1,0 +1,107 @@
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- 1. PROCURA OS NOMES QUE ESTÃO DENTRO DOS OVOS NO CHÃO
+local nomesDosOvosNoMapa = {}
+print("🔍 [1/3] Varrendo o mapa para achar os ovos...")
+
+for _, obj in ipairs(Workspace:GetDescendants()) do
+    if obj:IsA("Model") and string.len(obj.Name) > 20 and obj.PrimaryPart then
+        
+        local nomeReal = nil
+        
+        -- Tenta pegar o nome de atributos
+        local attrs = obj:GetAttributes()
+        nomeReal = attrs["EggName"] or attrs["DisplayName"] or attrs["Name"]
+        
+        -- Tenta pegar o nome de textos internos
+        if not nomeReal then
+            for _, desc in ipairs(obj:GetDescendants()) do
+                if desc:IsA("BillboardGui") or desc:IsA("SurfaceGui") then
+                    for _, texto in ipairs(desc:GetDescendants()) do
+                        if texto:IsA("TextLabel") and texto.Text ~= "" and not string.find(texto.Text, "%$") then
+                            nomeReal = texto.Text
+                            break
+                        end
+                    end
+                end
+                if nomeReal then break end
+            end
+        end
+        
+        -- Se achou um nome real, salva
+        if nomeReal then
+            print("   🥚 Ovo encontrado no chão com nome: '" .. nomeReal .. "' | UID: " .. obj.Name)
+            table.insert(nomesDosOvosNoMapa, nomeReal)
+        end
+    end
+end
+
+if #nomesDosOvosNoMapa == 0 then
+    print("   ⚠️ Nenhum nome real encontrado nos ovos do chão. Talvez o jogo use apenas UIDs.")
+end
+
+-- 2. VARRE A MEMÓRIA (GETGC) PROCURANDO TABELAS QUE LIGAM ESSES NOMES A IDs
+print("\n🔍 [2/3] Varrendo a RAM (getgc) para achar a tabela de IDs...")
+local idsEncontrados = {}
+
+local itens = getgc()
+for i = 1, #itens do
+    local item = itens[i]
+    if type(item) == "table" then
+        for k, v in pairs(item) do
+            -- Se o valor for um nome que está no mapa
+            if type(v) == "string" and table.find(nomesDosOvosNoMapa, v) then
+                -- A chave pode ser o ID numérico!
+                if type(k) == "number" then
+                    print("   🎯 MATCH! Nome: '" .. v .. "' | ID numérico: " .. tostring(k))
+                    table.insert(idsEncontrados, k)
+                elseif type(k) == "string" then
+                    -- Se a chave for string, pode ser um módulo de config
+                    print("   🎯 Encontrou nome em string: '" .. v .. "' | Chave: " .. tostring(k))
+                end
+            end
+            
+            -- Também procura tabelas internas que tenham Nome e ID juntos
+            if type(v) == "table" and v.Name then
+                if table.find(nomesDosOvosNoMapa, v.Name) then
+                    local id = v.Id or v.ID or v.EggId
+                    if id then
+                        print("   🎯 MATCH INTERNO! Nome: '" .. v.Name .. "' | ID: " .. tostring(id))
+                        table.insert(idsEncontrados, id)
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- 3. VERIFICA OS MÓDULOS DE CONFIG (ReplicatedStorage.Data.Assets.Configs)
+print("\n🔍 [3/3] Verificando módulos de config (Data.Assets.Configs)...")
+local configs = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild("Assets") and ReplicatedStorage.Data.Assets:FindFirstChild("Configs")
+
+if configs then
+    for _, module in ipairs(configs:GetChildren()) do
+        if module:IsA("ModuleScript") then
+            local sucesso, data = pcall(require, module)
+            if sucesso and type(data) == "table" then
+                -- Verifica se o nome do módulo ou o nome de data.Egg está na lista do mapa
+                local nomeModulo = module.Name
+                local nomeEgg = data.Egg and (data.Egg.DisplayName or data.Egg.Name) or nil
+                
+                if table.find(nomesDosOvosNoMapa, nomeModulo) or table.find(nomesDosOvosNoMapa, nomeEgg) then
+                    print("   🎯 ENCONTRADO NO MODULO! Nome: '" .. tostring(nomeEgg or nomeModulo) .. "' | Nome do arquivo: " .. nomeModulo)
+                    
+                    -- Tenta ver se o módulo tem um ID associado
+                    if data.Id or data.EggId then
+                        print("      -> ID numérico dentro do módulo: " .. tostring(data.Id or data.EggId))
+                    end
+                end
+            end
+        end
+    end
+end
+
+print("\n✅ Varredura concluída!")
+print("   Nomes no mapa:", #nomesDosOvosNoMapa)
+print("   IDs numéricos encontrados:", #idsEncontrados)
