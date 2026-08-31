@@ -1,0 +1,112 @@
+Estou analisando o jogo "Steal an Egg" no Roblox em um ambiente de testes autorizado. Quero descobrir como o cliente recebe os dados dos ovos que aparecem no mapa.
+
+Meu objetivo é identificar, em tempo real, quando um novo ovo aparece e obter seus dados estruturados, principalmente:
+
+* Nome
+* ID/modelo
+* Raridade
+* Valor
+
+Não quero usar OCR nem depender de `TextLabel`/GUI, porque os textos podem desaparecer rapidamente.
+
+### O que já descobri
+
+Existe um script chamado LennonHub que consegue identificar instantaneamente os ovos e mostrar informações semelhantes a:
+
+`Koi — Cosmic — 11.84M`
+
+Também encontrei estes objetos:
+
+`ReplicatedStorage.Packages.Networking.RE.EventFieldEggDrop`
+
+Tipo: `RemoteEvent`
+
+E:
+
+`ReplicatedStorage.Packages.Networking.REF.EggWorld.AskFieldEggSnapshot`
+
+Tipo: `RemoteFunction`
+
+Tentei usar `AskFieldEggSnapshot:InvokeServer()`, mas não consegui obter os dados esperados.
+
+Quando novos ovos aparecem, o F9 também mostra uma mensagem semelhante a:
+
+`Asset exibido no viewport: Mosasaurus`
+
+Isso sugere que o cliente recebe algum identificador/nome e posteriormente associa esse identificador a um asset/modelo.
+
+### O que quero investigar
+
+Não assuma que `EventFieldEggDrop` contém diretamente o valor e a raridade.
+
+Quero primeiro descobrir exatamente qual é o fluxo:
+
+Servidor → Remote → cliente → ID/Nome → ModuleScript/configuração → Raridade/Valor.
+
+Analise as possibilidades e explique como investigar isso no cliente.
+
+Preciso especialmente de:
+
+1. Um método para inspecionar os argumentos recebidos por `EventFieldEggDrop`, mostrando o tipo e o conteúdo de cada argumento sem modificar o comportamento do jogo.
+
+2. Uma forma de identificar se os dados são enviados como:
+
+   * tabela;
+   * string;
+   * número/ID;
+   * Instance;
+   * atributo;
+   * ou algum identificador serializado.
+
+3. Depois de descobrir o identificador, uma estratégia para procurar onde o cliente transforma esse identificador em:
+
+   * nome;
+   * raridade;
+   * valor.
+
+4. Mostre como procurar por ModuleScripts/configurações relacionadas a `Egg`, `FieldEgg`, `Rarity`, `Value`, `Price`, `Mosasaurus`, etc.
+
+5. Se existir uma tabela local contendo algo semelhante a:
+
+```lua
+{
+    Id = "...",
+    Name = "Mosasaurus",
+    Rarity = "Secret",
+    Value = 11840000
+}
+```
+
+explique como localizar essa tabela e consultar os dados corretamente.
+
+6. Se `EventFieldEggDrop` não possuir essas informações, explique quais outros pontos do fluxo devem ser investigados.
+
+7. Quero priorizar os dados estruturados recebidos pelo cliente, e não elementos visuais da interface.
+
+8. Não invente nomes de campos, argumentos ou estruturas que não tenham sido observados. Quando algo for apenas uma hipótese, deixe isso explícito.
+
+### Resultado desejado
+
+No final, quero chegar a uma função conceitual parecida com:
+
+```lua
+local egg = {
+    Name = "...",
+    Rarity = "...",
+    Value = 0
+}
+
+if egg.Rarity == "Secret"
+or egg.Rarity == "Eternal"
+or egg.Rarity == "Divine" then
+
+    -- aqui posteriormente vou implementar meu alerta
+
+end
+```
+
+O mais importante agora não é o Discord Webhook.
+
+Primeiro quero descobrir **de onde o cliente obtém o valor e a raridade do ovo e como acessar esses dados no momento em que um novo ovo é recebido/spawnado**.
+
+Forneça uma abordagem de investigação passo a passo e, quando possível, código Lua de diagnóstico que mostre exatamente o que está sendo recebido.
