@@ -1,0 +1,196 @@
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+
+local UI_NAME = "LennonHub_Final"
+if CoreGui:FindFirstChild(UI_NAME) then
+    CoreGui[UI_NAME]:Destroy()
+elseif LocalPlayer.PlayerGui:FindFirstChild(UI_NAME) then
+    LocalPlayer.PlayerGui[UI_NAME]:Destroy()
+end
+
+local ESP_NAME = "LennonEggESP_Final"
+if Workspace:FindFirstChild(ESP_NAME) then
+    Workspace[ESP_NAME]:Destroy()
+end
+
+local Folder = Instance.new("Folder")
+Folder.Name = ESP_NAME
+Folder.Parent = Workspace
+
+-- ==========================================
+-- 1. CRIAÇÃO DA INTERFACE (TELINHA DO HUB)
+-- ==========================================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = UI_NAME
+pcall(function() ScreenGui.Parent = CoreGui end)
+if not ScreenGui.Parent then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 320, 0, 420)
+MainFrame.Position = UDim2.new(0.05, 0, 0.3, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(12, 16, 12)
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 12)
+UICorner.Parent = MainFrame
+
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Color = Color3.fromRGB(40, 80, 40)
+UIStroke.Thickness = 1
+UIStroke.Parent = MainFrame
+
+local Header = Instance.new("Frame")
+Header.Size = UDim2.new(1, 0, 0, 60)
+Header.BackgroundTransparency = 1
+Header.Parent = MainFrame
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -20, 0, 20)
+Title.Position = UDim2.new(0, 15, 0, 15)
+Title.BackgroundTransparency = 1
+Title.Text = "LENNON HUB"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 16
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = Header
+
+local SubTitle = Instance.new("TextLabel")
+SubTitle.Size = UDim2.new(1, -20, 0, 15)
+SubTitle.Position = UDim2.new(0, 15, 0, 35)
+SubTitle.BackgroundTransparency = 1
+SubTitle.Text = "EGG & PET MONITOR"
+SubTitle.TextColor3 = Color3.fromRGB(100, 120, 100)
+SubTitle.Font = Enum.Font.Gotham
+SubTitle.TextSize = 10
+SubTitle.TextXAlignment = Enum.TextXAlignment.Left
+SubTitle.Parent = Header
+
+local ScrollList = Instance.new("ScrollingFrame")
+ScrollList.Size = UDim2.new(1, -20, 1, -80)
+ScrollList.Position = UDim2.new(0, 10, 0, 70)
+ScrollList.BackgroundTransparency = 1
+ScrollList.ScrollBarThickness = 0
+ScrollList.Parent = MainFrame
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.Padding = UDim.new(0, 8)
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Parent = ScrollList
+
+local function formatNumber(n)
+    if not n then return "0" end
+    if n >= 1e9 then return string.format("%.2fB", n / 1e9) end
+    if n >= 1e6 then return string.format("%.2fM", n / 1e6) end
+    if n >= 1e3 then return string.format("%.2fK", n / 1e3) end
+    return tostring(n)
+end
+
+local function criarTagNoOvo(modelo, texto)
+    if modelo:FindFirstChild("LennonTag") then return end
+
+    local Billboard = Instance.new("BillboardGui")
+    Billboard.Name = "LennonTag"
+    Billboard.Size = UDim2.new(0, 160, 0, 40)
+    Billboard.StudsOffset = Vector3.new(0, 3, 0)
+    Billboard.AlwaysOnTop = true
+    Billboard.Adornee = modelo
+    Billboard.Parent = Folder
+
+    local TextLabel = Instance.new("TextLabel")
+    TextLabel.Size = UDim2.new(1, 0, 1, 0)
+    TextLabel.BackgroundTransparency = 1
+    TextLabel.Text = texto
+    TextLabel.TextColor3 = Color3.fromRGB(50, 255, 100)
+    TextLabel.TextStrokeTransparency = 0
+    TextLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    TextLabel.Font = Enum.Font.GothamBold
+    TextLabel.TextSize = 13
+    TextLabel.Parent = Billboard
+end
+
+local function addCard(rank, nome, valor)
+    local Card = Instance.new("Frame")
+    Card.Size = UDim2.new(1, 0, 0, 50)
+    Card.BackgroundColor3 = Color3.fromRGB(18, 22, 18)
+    Card.LayoutOrder = rank
+    Card.Parent = ScrollList
+
+    local CardCorner = Instance.new("UICorner")
+    CardCorner.CornerRadius = UDim.new(0, 10)
+    CardCorner.Parent = Card
+
+    local NameLabel = Instance.new("TextLabel")
+    NameLabel.Size = UDim2.new(0, 180, 0, 20)
+    NameLabel.Position = UDim2.new(0, 12, 0, 8)
+    NameLabel.BackgroundTransparency = 1
+    NameLabel.Text = nome
+    NameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    NameLabel.Font = Enum.Font.GothamBold
+    NameLabel.TextSize = 13
+    NameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    NameLabel.Parent = Card
+
+    local ValLabel = Instance.new("TextLabel")
+    ValLabel.Size = UDim2.new(0, 180, 0, 15)
+    ValLabel.Position = UDim2.new(0, 12, 0, 28)
+    ValLabel.BackgroundTransparency = 1
+    ValLabel.Text = "💰 " .. formatNumber(valor) .. "/s"
+    ValLabel.TextColor3 = Color3.fromRGB(50, 255, 100)
+    ValLabel.Font = Enum.Font.Gotham
+    ValLabel.TextSize = 11
+    ValLabel.TextXAlignment = Enum.TextXAlignment.Left
+    ValLabel.Parent = Card
+end
+
+-- ==========================================
+-- 2. VARREDURA EM TEMPO REAL (ESP + GUI)
+-- ==========================================
+task.spawn(function()
+    while task.wait(2) do
+        -- Limpa cards antigos da lista visual para atualizar
+        for _, child in ipairs(ScrollList:GetChildren()) do
+            if child:IsA("Frame") then child:Destroy() end
+        end
+
+        local count = 0
+        for _, obj in pairs(getgc(true)) do
+            if type(obj) == "table" then
+                pcall(function()
+                    if obj.MoneyPerSecond and (obj.UID or obj.Id) then
+                        local uid = tostring(obj.UID or obj.Id)
+                        local nomeBicho = "Ovo"
+                        
+                        if type(obj.ItemData) == "table" then
+                            nomeBicho = obj.ItemData.Id or obj.ItemData.Type or "Ovo"
+                        elseif obj.Name then
+                            nomeBicho = obj.Name
+                        end
+                        
+                        nomeBicho = tostring(nomeBicho):gsub(" Egg", "")
+                        local valor = tonumber(obj.MoneyPerSecond) or 0
+
+                        -- Acha o modelo físico no mapa e bota o ESP flutuante
+                        local modeloNoChao = Workspace:FindFirstChild(uid, true)
+                        if modeloNoChao and modeloNoChao:IsA("Model") then
+                            criarTagNoOvo(modeloNoChao, string.format("🥚 %s\n⚡ %s/s", nomeBicho, formatNumber(valor)))
+                        end
+
+                        -- Adiciona na telinha do Hub
+                        count = count + 1
+                        if count <= 15 then -- Lista os 15 principais na UI
+                            addCard(count, nomeBicho, valor)
+                        end
+                    end
+                end)
+            end
+        end
+    end
+end)
+
+print("[LENNON HUB] Carregado com sucesso!")
