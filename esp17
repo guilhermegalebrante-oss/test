@@ -1,0 +1,233 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+-- 1. ROUBANDO O MÓDULO E GRAMPEANDO O "GET"
+local MutationsModule = nil
+local IdsCapturados = {}
+
+for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+    if obj:IsA("ModuleScript") and obj.Name == "Mutations" then
+        local sucesso, modulo = pcall(require, obj)
+        if sucesso then
+            MutationsModule = modulo
+            if type(MutationsModule.Get) == "function" then
+                local GetOriginal = MutationsModule.Get
+                MutationsModule.Get = function(id, ...)
+                    -- Só captura IDs numéricos (ignora os UIDs hexadecimais dos modelos)
+                    if typeof(id) == "number" then
+                        table.insert(IdsCapturados, id)
+                    end
+                    return GetOriginal(id, ...)
+                end
+            end
+        end
+        break
+    end
+end
+
+-- 2. FUNÇÃO PARA VARRER A RAM (GETGC) E ACHAR A TABELA MESTRE DE OVOS
+local function varrerMemoriaProfunda()
+    local ovos = {}
+    local itens = getgc()
+    
+    -- Procura por tabelas que sejam bancos de dados de ovos (com nome, valor e raridade)
+    for i = 1, #itens do
+        local item = itens[i]
+        if type(item) == "table" then
+            local count = 0
+            local tempOvos = {}
+            
+            -- Verifica se a tabela parece ser um dicionário de ovos
+            for k, v in pairs(item) do
+                -- A chave deve ser um número (ID do ovo) e o valor deve ser uma tabela
+                if typeof(k) == "number" and type(v) == "table" then
+                    local nome = v.DisplayName or v.Name or v.EggName
+                    local valor = v.Value or v.Price or v.Earnings
+                    
+                    if type(nome) == "string" and type(valor) == "number" and valor > 0 then
+                        table.insert(tempOvos, {Id = k, Nome = nome, Valor = valor, Raridade = v.Rarity or "?"})
+                        count = count + 1
+                    end
+                end
+                
+                -- Se achar mais de 5 itens válidos, é a tabela mestre
+                if count > 5 then
+                    break
+                end
+            end
+            
+            if count > 5 then
+                ovos = tempOvos
+                break
+            end
+        end
+    end
+
+    -- Se não achou a tabela mestre, usa os IDs capturados pelo grampo
+    if #ovos == 0 and #IdsCapturados > 0 then
+        local vistos = {}
+        for _, id in ipairs(IdsCapturados) do
+            if not vistos[id] then
+                vistos[id] = true
+                local nome = "Ovo " .. tostring(id)
+                local valor = 0
+                local raridade = "?"
+
+                pcall(function()
+                    if MutationsModule.EggDisplayName then nome = MutationsModule.EggDisplayName(id) end
+                end)
+                pcall(function()
+                    if MutationsModule.RarityFactorFor then raridade = MutationsModule.RarityFactorFor(id) end
+                end)
+                pcall(function()
+                    if MutationsModule.EarningsFor then valor = MutationsModule.EarningsFor(id) end
+                end)
+
+                if valor > 0 then
+                    table.insert(ovos, {Id = id, Nome = nome, Valor = valor, Raridade = raridade})
+                end
+            end
+        end
+    end
+
+    -- Ordena do maior para o menor
+    table.sort(ovos, function(a, b) return a.Valor > b.Valor end)
+    return ovos
+end
+
+-- 3. CRIAÇÃO DA GUI (Estilo Lennon Hub)
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "LennonHubRAM"
+ScreenGui.Parent = player:WaitForChild("PlayerGui")
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 400, 0, 550)
+MainFrame.Position = UDim2.new(0.5, -200, 0.5, -275)
+MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = ScreenGui
+
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 50)
+TitleBar.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+TitleBar.Parent = MainFrame
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(0, 200, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.Text = "LENNON HUB"
+Title.Font = Enum.Font.GothamBold
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.TextSize = 20
+Title.Parent = TitleBar
+
+local SubTitle = Instance.new("TextLabel")
+SubTitle.Size = UDim2.new(0, 200, 0, 20)
+SubTitle.Position = UDim2.new(0, 12, 0, 28)
+SubTitle.Text = "SCANNER DE RAM (OVOS NÃO NASCIDOS)"
+SubTitle.Font = Enum.Font.Gotham
+SubTitle.TextColor3 = Color3.fromRGB(150, 150, 150)
+SubTitle.TextXAlignment = Enum.TextXAlignment.Left
+SubTitle.TextSize = 10
+SubTitle.Parent = TitleBar
+
+local List = Instance.new("ScrollingFrame")
+List.Size = UDim2.new(1, -20, 1, -70)
+List.Position = UDim2.new(0, 10, 0, 60)
+List.BackgroundTransparency = 1
+List.Parent = MainFrame
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.Padding = UDim.new(0, 10)
+UIListLayout.Parent = List
+
+local function getRarityColor(r)
+    local rLower = string.lower(r or "")
+    if string.find(rLower, "cosmic") then return Color3.fromRGB(180, 0, 255) end
+    if string.find(rLower, "mythic") then return Color3.fromRGB(255, 100, 0) end
+    if string.find(rLower, "legend") then return Color3.fromRGB(255, 215, 0) end
+    if string.find(rLower, "epic") then return Color3.fromRGB(150, 0, 255) end
+    if string.find(rLower, "rare") then return Color3.fromRGB(0, 150, 255) end
+    return Color3.fromRGB(180, 180, 180)
+end
+
+local function formatValue(v)
+    if v >= 1000000 then return string.format("%.2fM", v/1000000) end
+    if v >= 1000 then return string.format("%.2fK", v/1000) end
+    return tostring(math.floor(v))
+end
+
+local function renderEggs(ovos)
+    for _, child in pairs(List:GetChildren()) do
+        if child:IsA("Frame") then child:Destroy() end
+    end
+
+    if #ovos > 0 then
+        for i, egg in ipairs(ovos) do
+            if i > 12 then break end
+            
+            local row = Instance.new("Frame")
+            row.Size = UDim2.new(1, 0, 0, 60)
+            row.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+            row.Parent = List
+            
+            local rank = Instance.new("TextLabel")
+            rank.Size = UDim2.new(0, 40, 1, 0)
+            rank.Text = "#" .. i
+            rank.TextColor3 = Color3.new(0.5, 0.5, 0.5)
+            rank.Font = Enum.Font.GothamBold
+            rank.TextXAlignment = Enum.TextXAlignment.Center
+            rank.Parent = row
+
+            local nome = Instance.new("TextLabel")
+            nome.Size = UDim2.new(0, 180, 0, 25)
+            nome.Position = UDim2.new(0, 40, 0, 5)
+            nome.Text = egg.Nome
+            nome.TextColor3 = Color3.new(1, 1, 1)
+            nome.Font = Enum.Font.GothamBold
+            nome.TextScaled = true
+            nome.TextXAlignment = Enum.TextXAlignment.Left
+            nome.Parent = row
+
+            local rar = Instance.new("TextLabel")
+            rar.Size = UDim2.new(0, 180, 0, 20)
+            rar.Position = UDim2.new(0, 40, 0, 30)
+            rar.Text = egg.Raridade
+            rar.TextColor3 = getRarityColor(egg.Raridade)
+            rar.Font = Enum.Font.Gotham
+            rar.TextSize = 14
+            rar.TextXAlignment = Enum.TextXAlignment.Left
+            rar.Parent = row
+
+            local val = Instance.new("TextLabel")
+            val.Size = UDim2.new(0, 120, 1, 0)
+            val.Position = UDim2.new(1, -130, 0, 0)
+            val.Text = formatValue(egg.Valor)
+            val.TextColor3 = Color3.new(1, 1, 1)
+            val.Font = Enum.Font.GothamBold
+            val.TextSize = 15
+            val.TextXAlignment = Enum.TextXAlignment.Right
+            val.Parent = row
+        end
+    else
+        local empty = Instance.new("TextLabel")
+        empty.Size = UDim2.new(1, 0, 0, 40)
+        empty.Text = "Escaneando RAM (getgc)...\nJogue por 5 segundos!"
+        empty.TextColor3 = Color3.new(1, 1, 1)
+        empty.Parent = List
+    end
+end
+
+-- 4. LOOP DE ATUALIZAÇÃO
+task.spawn(function()
+    while true do
+        local ovos = varrerMemoriaProfunda()
+        renderEggs(ovos)
+        task.wait(5)
+    end
+end)
+
+print("🚀 Scanner de RAM ativado! Procurando banco de dados mestre dos ovos...")
